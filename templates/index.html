@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emotion Classification Chat</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+        }
+        .chat-container {
+            max-width: 600px;
+            margin: 0 auto;
+            border: 1px solid #ccc;
+            padding: 20px;
+            background-color: white;
+            border-radius: 5px;
+        }
+        .chat-box {
+            height: 300px;
+            overflow-y: scroll;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 20px;
+            background-color: #fafafa;
+        }
+        .chat-box p {
+            margin: 5px 0;
+        }
+        .user-message {
+            color: blue;
+        }
+        .model-message {
+            color: green;
+        }
+        .system-message {
+            color: gray;
+        }
+        .input-box {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+        .feedback-box {
+            display: none;
+            margin-top: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .valid-emotions {
+            margin-top: 20px;
+            font-size: 0.9em;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <h2>Emotion Classification Chat</h2>
+        <div class="chat-box" id="chatBox"></div>
+        <input type="text" id="userInput" class="input-box" placeholder="Type your message here..." onkeypress="if(event.keyCode==13) sendMessage()">
+        <button onclick="sendMessage()">Send</button>
+        <div class="feedback-box" id="feedbackBox">
+            <input type="text" id="feedbackInput" class="input-box" placeholder="Type 'pass' or the corrected emotion..." onkeypress="if(event.keyCode==13) submitFeedback()">
+            <button onclick="submitFeedback()">Submit Feedback</button>
+        </div>
+        <div>
+            <a href="/download_log"><button>Download Interaction Log</button></a>
+        </div>
+        <div class="valid-emotions">
+            <p><strong>Valid emotions:</strong> {{ valid_emotions | join(', ') }}</p>
+        </div>
+    </div>
+
+    <script>
+        let currentInput = '';
+        let currentPrediction = '';
+
+        function sendMessage() {
+            const userInput = document.getElementById('userInput').value.trim();
+            if (!userInput) return;
+
+            // Display user message
+            const chatBox = document.getElementById('chatBox');
+            chatBox.innerHTML += `<p class="user-message">You: ${userInput}</p>`;
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            // Send to server for prediction
+            fetch('/predict', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: userInput })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    chatBox.innerHTML += `<p class="model-message">Error: ${data.error}</p>`;
+                } else {
+                    currentInput = userInput;
+                    currentPrediction = data.predicted_emotion;
+                    chatBox.innerHTML += `<p class="model-message">Model: Predicted emotion: ${currentPrediction}</p>`;
+                    document.getElementById('feedbackBox').style.display = 'block';
+                }
+                chatBox.scrollTop = chatBox.scrollHeight;
+            })
+            .catch(error => {
+                chatBox.innerHTML += `<p class="model-message">Error: ${error}</p>`;
+                chatBox.scrollTop = chatBox.scrollHeight;
+            });
+
+            document.getElementById('userInput').value = '';
+        }
+
+        function submitFeedback() {
+            const feedback = document.getElementById('feedbackInput').value.trim();
+            if (!feedback) return;
+
+            // Send feedback to server
+            fetch('/feedback', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    input_text: currentInput,
+                    predicted_emotion: currentPrediction,
+                    feedback: feedback
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                const chatBox = document.getElementById('chatBox');
+                chatBox.innerHTML += `<p class="system-message">System: ${data.message}</p>`;
+                chatBox.scrollTop = chatBox.scrollHeight;
+                document.getElementById('feedbackBox').style.display = 'none';
+                document.getElementById('feedbackInput').value = '';
+            })
+            .catch(error => {
+                const chatBox = document.getElementById('chatBox');
+                chatBox.innerHTML += `<p class="system-message">Error: ${error}</p>`;
+                chatBox.scrollTop = chatBox.scrollHeight;
+            });
+        }
+    </script>
+</body>
+</html>
