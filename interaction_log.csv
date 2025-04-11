@@ -1,0 +1,4 @@
+timestamp,input_text,predicted_emotion,user_feedback,corrected_emotion
+2025-04-10 19:10:34,انا سعيد جدا,neutral,joy,joy
+2025-04-11 15:29:23,anonymous,i'm feeling sad,sad,0.4223959445953369,pass,sad
+2025-04-11 15:46:33,anonymous,i'm feeling sad,sad,0.4223959445953369,pass,sad

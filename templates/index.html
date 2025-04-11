@@ -3,155 +3,495 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Emotion Classification Chat</title>
+    <title>Emotion Classification</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-            background-color: #f4f4f4;
+            font-family: 'Inter', sans-serif;
         }
         .chat-container {
-            max-width: 600px;
+            max-width: 1200px;
             margin: 0 auto;
-            border: 1px solid #ccc;
             padding: 20px;
-            background-color: white;
-            border-radius: 5px;
+            display: flex;
+            gap: 20px;
         }
         .chat-box {
-            height: 300px;
-            overflow-y: scroll;
-            border: 1px solid #ddd;
-            padding: 10px;
-            margin-bottom: 20px;
-            background-color: #fafafa;
+            flex: 2;
+            background: #f8fafc;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
         }
-        .chat-box p {
-            margin: 5px 0;
+        .info-panel {
+            flex: 1;
+            background: #f8fafc;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
         }
         .user-message {
-            color: blue;
+            background: #e0f2fe;
+            border-radius: 10px;
+            max-width: 80%;
         }
         .model-message {
-            color: green;
+            background: #f1f5f9;
+            border-radius: 10px;
+            max-width: 80%;
         }
         .system-message {
-            color: gray;
+            background: #fef3c7;
+            border-radius: 10px;
+            max-width: 80%;
         }
-        .input-box {
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 10px;
-            border: 1px solid #ccc;
-            border-radius: 3px;
+        .confidence-bar {
+            height: 8px;
+            background: #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
         }
-        .feedback-box {
-            display: none;
-            margin-top: 10px;
+        .confidence-level {
+            height: 100%;
+            transition: width 0.3s ease;
         }
-        button {
+        .emotion-tag {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
             padding: 10px 20px;
-            background-color: #007bff;
+            border-radius: 5px;
             color: white;
-            border: none;
-            border-radius: 3px;
-            cursor: pointer;
+            z-index: 1000;
+            transition: opacity 0.3s ease;
         }
-        button:hover {
-            background-color: #0056b3;
+        .notification.success {
+            background: #10b981;
         }
-        .valid-emotions {
-            margin-top: 20px;
-            font-size: 0.9em;
-            color: #555;
+        .notification.error {
+            background: #ef4444;
+        }
+        .notification.warning {
+            background: #f59e0b;
         }
     </style>
 </head>
-<body>
+<body class="bg-gray-100">
     <div class="chat-container">
-        <h2>Emotion Classification Chat</h2>
-        <div class="chat-box" id="chatBox"></div>
-        <input type="text" id="userInput" class="input-box" placeholder="Type your message here..." onkeypress="if(event.keyCode==13) sendMessage()">
-        <button onclick="sendMessage()">Send</button>
-        <div class="feedback-box" id="feedbackBox">
-            <input type="text" id="feedbackInput" class="input-box" placeholder="Type 'pass' or the corrected emotion..." onkeypress="if(event.keyCode==13) submitFeedback()">
-            <button onclick="submitFeedback()">Submit Feedback</button>
+        <!-- Chat Interface -->
+        <div class="chat-box">
+            <h2 class="text-xl font-semibold mb-4">Chat Interface</h2>
+            <div id="chatBox" class="h-96 overflow-y-auto mb-4">
+                <div class="system-message p-3 my-2 mx-1 shadow-sm">
+                    Welcome to the Emotion Classification System! Type a message and I'll detect the emotion.
+                </div>
+            </div>
+            <div id="feedbackBox" class="mb-4 hidden">
+                <div class="flex items-center mb-2">
+                    <span class="mr-2">Is the classification accurate?</span>
+                    <button id="feedbackYes" class="bg-green-500 text-white px-3 py-1 rounded mr-2">Yes</button>
+                    <select id="feedbackEmotion" class="border rounded px-2 py-1 mr-2">
+                        <option value="">Select correct emotion...</option>
+                        <!-- Options will be populated dynamically -->
+                    </select>
+                    <button id="feedbackSubmit" class="bg-blue-500 text-white px-3 py-1 rounded">Submit</button>
+                </div>
+            </div>
+            <div class="flex">
+                <input type="text" id="userInput" class="flex-grow border rounded-l px-4 py-2" placeholder="Type your message here..." onkeypress="if(event.key === 'Enter') sendMessage()">
+                <button onclick="sendMessage()" class="bg-indigo-600 text-white px-4 py-2 rounded-r">Send <span class="ml-1">✈️</span></button>
+            </div>
         </div>
-        <div>
-            <a href="/download_log"><button>Download Interaction Log</button></a>
-        </div>
-        <div class="valid-emotions">
-            <p><strong>Valid emotions:</strong> {{ valid_emotions | join(', ') }}</p>
+
+        <!-- Emotion Information Panel -->
+        <div class="info-panel">
+            <h2 class="text-xl font-semibold mb-4">Emotion Information</h2>
+            <p class="text-gray-600 mb-4">This system uses machine learning to classify emotions in text.</p>
+            <p class="text-gray-600 mb-4">Your feedback helps improve the model accuracy over time.</p>
+            <div class="mt-4">
+                <h3 class="font-medium text-indigo-700">Available Emotions:</h3>
+                <div id="availableEmotions" class="flex flex-wrap gap-2 mt-2">
+                    <!-- Emotions will be populated dynamically -->
+                </div>
+            </div>
         </div>
     </div>
 
+    <!-- Notification Container -->
+    <div id="notificationContainer"></div>
+
+    <!-- Pass valid_emotions from Jinja2 to JavaScript -->
     <script>
-        let currentInput = '';
-        let currentPrediction = '';
+        const validEmotions = {{ valid_emotions | tojson }};
 
-        function sendMessage() {
-            const userInput = document.getElementById('userInput').value.trim();
-            if (!userInput) return;
+        // Function to get emotion color (for UI)
+        function getEmotionColor(emotion) {
+            const colors = {
+                'sad': '#3b82f6',
+                'sadness': '#1d4ed8',
+                'joy': '#f59e0b',
+                'anger': '#ef4444',
+                'love': '#ec4899',
+                'fear': '#6b7280',
+                'surprise': '#8b5cf6',
+                'neutral': '#6b7280',
+                // Add more emotions as needed
+                'default': '#6b7280'
+            };
+            // If emotion is a number, convert to name first
+            const emotionName = getEmotionName(emotion).split(' ')[0]; // Get the name without emoji
+            return colors[emotionName] || colors['default'];
+        }
 
-            // Display user message
+        // Convert emotion number to name and add emoji if available
+        function getEmotionName(emotion) {
+            // If emotion is a number or a string that represents a number
+            if (!isNaN(emotion) || (typeof emotion === 'string' && !isNaN(parseInt(emotion)))) {
+                // Create a mapping of number to emotion name with emojis
+                const emotionMapping = {
+                    '0': 'love ❤️',
+                    '1': 'jealous 😒',
+                    '2': 'surprise 😲',
+                    '3': 'sentimental 🥹',
+                    '4': 'optimism 🌞',
+                    '5': 'apprehensive 😟',
+                    '6': 'afraid 😨',
+                    '7': 'realization 💡',
+                    '8': 'excited 🎉',
+                    '9': 'relief 😅',
+                    '10': 'trusting 🤝',
+                    '11': 'desire 💖',
+                    '12': 'devastated 💔',
+                    '13': 'nostalgic 📜',
+                    '14': 'gratitude 🙏',
+                    '15': 'pride 🏆',
+                    '16': 'anger 😡',
+                    '17': 'sadness 😢',
+                    '18': 'confident 😊',
+                    '19': 'disgust 🤢',
+                    '20': 'angry 😠',
+                    '21': 'grief 😞',
+                    '22': 'surprised 😯',
+                    '23': 'joy 😄',
+                    '24': 'disappointment 😕',
+                    '25': 'embarrassment 😳',
+                    '26': 'shame 😓',
+                    '27': 'proud 🥳',
+                    '28': 'impressed 👏',
+                    '29': 'guilt 😔',
+                    '30': 'caring 🤗',
+                    '31': 'neutral 😐',
+                    '32': 'confusion 🤔',
+                    '33': 'fear 😱',
+                    '34': 'faithful 🙌',
+                    '35': 'annoyed 😤',
+                    '36': 'disgusted 🤮',
+                    '37': 'anxious 😰',
+                    '38': 'embarrassed 🙈',
+                    '39': 'content 😊',
+                    '40': 'furious 🤬',
+                    '41': 'amusement 😂',
+                    '42': 'curiosity 🧐',
+                    '43': 'lonely 🥀',
+                    '44': 'ashamed 😖',
+                    '45': 'disapproval 👎',
+                    '46': 'hopeful 🌟',
+                    '47': 'approval 👍',
+                    '48': 'prepared 🛠️',
+                    '49': 'joyful 😁',
+                    '50': 'annoyance 😣',
+                    '51': 'nervousness 😬',
+                    '52': 'terrified 😱',
+                    '53': 'sad 😢',
+                    '54': 'guilty 😓',
+                    '55': 'disappointed 😞',
+                    '56': 'anticipating ⏳',
+                    '57': 'grateful 🙏',
+                    '58': 'admiration 🌟',
+                    '59': 'excitement 🎊',
+                    '60': 'remorse 😔'
+                };
+
+                // Return the mapped emotion name with emoji or the original if not found
+                return emotionMapping[emotion.toString()] || `emotion ${emotion}`;
+            }
+
+            // If it's already a name, add emoji if available
+            const emotionWithEmoji = {
+                'love': 'love ❤️',
+                'jealous': 'jealous 😒',
+                'surprise': 'surprise 😲',
+                'sentimental': 'sentimental 🥹',
+                'optimism': 'optimism 🌞',
+                'apprehensive': 'apprehensive 😟',
+                'afraid': 'afraid 😨',
+                'realization': 'realization 💡',
+                'excited': 'excited 🎉',
+                'relief': 'relief 😅',
+                'trusting': 'trusting 🤝',
+                'desire': 'desire 💖',
+                'devastated': 'devastated 💔',
+                'nostalgic': 'nostalgic 📜',
+                'gratitude': 'gratitude 🙏',
+                'pride': 'pride 🏆',
+                'anger': 'anger 😡',
+                'sadness': 'sadness 😢',
+                'confident': 'confident 😊',
+                'disgust': 'disgust 🤢',
+                'angry': 'angry 😠',
+                'grief': 'grief 😞',
+                'surprised': 'surprised 😯',
+                'joy': 'joy 😄',
+                'disappointment': 'disappointment 😕',
+                'embarrassment': 'embarrassment 😳',
+                'shame': 'shame 😓',
+                'proud': 'proud 🥳',
+                'impressed': 'impressed 👏',
+                'guilt': 'guilt 😔',
+                'caring': 'caring 🤗',
+                'neutral': 'neutral 😐',
+                'confusion': 'confusion 🤔',
+                'fear': 'fear 😱',
+                'faithful': 'faithful 🙌',
+                'annoyed': 'annoyed 😤',
+                'disgusted': 'disgusted 🤮',
+                'anxious': 'anxious 😰',
+                'embarrassed': 'embarrassed 🙈',
+                'content': 'content 😊',
+                'furious': 'furious 🤬',
+                'amusement': 'amusement 😂',
+                'curiosity': 'curiosity 🧐',
+                'lonely': 'lonely 🥀',
+                'ashamed': 'ashamed 😖',
+                'disapproval': 'disapproval 👎',
+                'hopeful': 'hopeful 🌟',
+                'approval': 'approval 👍',
+                'prepared': 'prepared 🛠️',
+                'joyful': 'joyful 😁',
+                'annoyance': 'annoyance 😣',
+                'nervousness': 'nervousness 😬',
+                'terrified': 'terrified 😱',
+                'sad': 'sad 😢',
+                'guilty': 'guilty 😓',
+                'disappointed': 'disappointed 😞',
+                'anticipating': 'anticipating ⏳',
+                'grateful': 'grateful 🙏',
+                'admiration': 'admiration 🌟',
+                'excitement': 'excitement 🎊',
+                'remorse': 'remorse 😔'
+            };
+
+            return emotionWithEmoji[emotion.toLowerCase()] || emotion;
+        }
+
+        // Populate Available Emotions dynamically
+        function populateAvailableEmotions() {
+            const availableEmotionsDiv = document.getElementById('availableEmotions');
+            availableEmotionsDiv.innerHTML = ''; // Clear any existing content
+            validEmotions.forEach(emotion => {
+                const span = document.createElement('span');
+                span.className = 'bg-gray-200 text-gray-800 rounded-full px-3 py-1 text-sm';
+                span.textContent = getEmotionName(emotion);
+                availableEmotionsDiv.appendChild(span);
+            });
+        }
+
+        // Populate Feedback Dropdown dynamically
+        function populateFeedbackDropdown() {
+            const feedbackEmotionSelect = document.getElementById('feedbackEmotion');
+            feedbackEmotionSelect.innerHTML = '<option value="">Select correct emotion...</option>'; // Reset options
+            validEmotions.forEach(emotion => {
+                const option = document.createElement('option');
+                option.value = emotion; // Keep the original value for backend compatibility
+                option.textContent = getEmotionName(emotion); // Display the name with emoji
+                feedbackEmotionSelect.appendChild(option);
+            });
+        }
+
+        // Add a message to the chat box
+        function addMessageToChat(text, type, metadata = {}) {
             const chatBox = document.getElementById('chatBox');
-            chatBox.innerHTML += `<p class="user-message">You: ${userInput}</p>`;
-            chatBox.scrollTop = chatBox.scrollHeight;
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `${type} p-3 my-2 mx-1 shadow-sm`;
 
-            // Send to server for prediction
-            fetch('/predict', {
+            let content = '';
+
+            if (type === 'user-message') {
+                content = `<div class="font-medium">You:</div><div>${text}</div>`;
+            } else if (type === 'model-message') {
+                // Make sure we have an emotion name, not a number
+                const emotionName = getEmotionName(metadata.emotion || 'unknown');
+                const confidence = metadata.confidence || 0;
+                const emotionColor = getEmotionColor(metadata.emotion);
+
+                content = `
+                    <div class="font-medium">Model:</div>
+                    <div class="mb-1">I detect: ${emotionName}</div>
+                    <div class="flex items-center mt-2">
+                        <span class="emotion-tag mr-2" style="background-color: ${emotionColor}30; color: ${emotionColor}">
+                            ${emotionName}
+                        </span>
+                        <div class="confidence-bar flex-grow">
+                            <div class="confidence-level" style="width: ${confidence * 100}%; background-color: ${emotionColor}"></div>
+                        </div>
+                        <span class="text-xs ml-2">${Math.round(confidence * 100)}%</span>
+                    </div>
+                `;
+            } else {
+                content = `<div>${text}</div>`;
+            }
+
+            messageDiv.innerHTML = content;
+            chatBox.appendChild(messageDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        // Show notification
+        function showNotification(message, type) {
+            const container = document.getElementById('notificationContainer');
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            container.appendChild(notification);
+
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
+
+        // Check system status
+        function checkSystemStatus() {
+            fetch('/api/system_status')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'retraining') {
+                        showNotification('System is currently retraining...', 'warning');
+                    }
+                })
+                .catch(error => console.error('Error checking system status:', error));
+        }
+
+        // Send message to the server
+        function sendMessage() {
+            const userInput = document.getElementById('userInput');
+            const text = userInput.value.trim();
+
+            if (!text) return;
+
+            userInput.disabled = true;
+            addMessageToChat(text, 'user-message');
+
+            fetch('/api/predict', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: userInput })
+                body: JSON.stringify({ text: text })
             })
             .then(response => response.json())
             .then(data => {
                 if (data.error) {
-                    chatBox.innerHTML += `<p class="model-message">Error: ${data.error}</p>`;
-                } else {
-                    currentInput = userInput;
-                    currentPrediction = data.predicted_emotion;
-                    chatBox.innerHTML += `<p class="model-message">Model: Predicted emotion: ${currentPrediction}</p>`;
-                    document.getElementById('feedbackBox').style.display = 'block';
+                    throw new Error(data.error);
                 }
-                chatBox.scrollTop = chatBox.scrollHeight;
+
+                // Convert emotion number to name if needed
+                const emotionName = getEmotionName(data.predicted_emotion);
+
+                addMessageToChat('', 'model-message', {
+                    emotion: data.predicted_emotion,  // Pass the original emotion for color mapping
+                    confidence: data.confidence
+                });
+
+                // Show feedback box
+                const feedbackBox = document.getElementById('feedbackBox');
+                feedbackBox.classList.remove('hidden');
+                feedbackBox.dataset.inputText = text;
+                feedbackBox.dataset.predictedEmotion = data.predicted_emotion;
+                feedbackBox.dataset.confidence = data.confidence;
             })
             .catch(error => {
-                chatBox.innerHTML += `<p class="model-message">Error: ${error}</p>`;
-                chatBox.scrollTop = chatBox.scrollHeight;
+                addMessageToChat(`Error: ${error}`, 'system-message');
+                showNotification(`Error: ${error}`, 'error');
+            })
+            .finally(() => {
+                userInput.disabled = false;
+                userInput.value = '';
             });
-
-            document.getElementById('userInput').value = '';
         }
 
-        function submitFeedback() {
-            const feedback = document.getElementById('feedbackInput').value.trim();
-            if (!feedback) return;
+        // Handle feedback submission
+        document.getElementById('feedbackYes').addEventListener('click', () => {
+            const feedbackBox = document.getElementById('feedbackBox');
+            const inputText = feedbackBox.dataset.inputText;
+            const predictedEmotion = feedbackBox.dataset.predictedEmotion;
+            const confidence = feedbackBox.dataset.confidence;
 
-            // Send feedback to server
-            fetch('/feedback', {
+            fetch('/api/feedback', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    input_text: currentInput,
-                    predicted_emotion: currentPrediction,
-                    feedback: feedback
+                    input_text: inputText,
+                    predicted_emotion: predictedEmotion,
+                    feedback: 'pass',
+                    confidence: parseFloat(confidence)
                 })
             })
             .then(response => response.json())
             .then(data => {
-                const chatBox = document.getElementById('chatBox');
-                chatBox.innerHTML += `<p class="system-message">System: ${data.message}</p>`;
-                chatBox.scrollTop = chatBox.scrollHeight;
-                document.getElementById('feedbackBox').style.display = 'none';
-                document.getElementById('feedbackInput').value = '';
+                showNotification(data.message, 'success');
+                feedbackBox.classList.add('hidden');
             })
             .catch(error => {
-                const chatBox = document.getElementById('chatBox');
-                chatBox.innerHTML += `<p class="system-message">Error: ${error}</p>`;
-                chatBox.scrollTop = chatBox.scrollHeight;
+                showNotification(`Error submitting feedback: ${error}`, 'error');
             });
-        }
+        });
+
+        document.getElementById('feedbackSubmit').addEventListener('click', () => {
+            const feedbackBox = document.getElementById('feedbackBox');
+            const inputText = feedbackBox.dataset.inputText;
+            const predictedEmotion = feedbackBox.dataset.predictedEmotion;
+            const confidence = feedbackBox.dataset.confidence;
+            const correctedEmotion = document.getElementById('feedbackEmotion').value;
+
+            if (!correctedEmotion) {
+                showNotification('Please select a corrected emotion', 'error');
+                return;
+            }
+
+            fetch('/api/feedback', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    input_text: inputText,
+                    predicted_emotion: predictedEmotion,
+                    feedback: correctedEmotion,
+                    confidence: parseFloat(confidence)
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                showNotification(data.message, 'success');
+                feedbackBox.classList.add('hidden');
+            })
+            .catch(error => {
+                showNotification(`Error submitting feedback: ${error}`, 'error');
+            });
+        });
+
+        // Populate Available Emotions and Feedback Dropdown on page load
+        window.onload = function() {
+            populateAvailableEmotions();
+            populateFeedbackDropdown();
+        };
+
+        // Periodically check system status
+        setInterval(checkSystemStatus, 5000);
+        checkSystemStatus();
     </script>
 </body>
 </html>

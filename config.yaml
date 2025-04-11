@@ -1,0 +1,22 @@
+# Application settings
+app:
+  log_file: "interaction_log.csv"  # Path to the interaction log file
+  users_file: "users.json"         # Path to the users file
+  enable_registration: true        # Enable/disable user registration
+  debug: true                      # Enable/disable Flask debug mode
+  backup_dir: "backups"            # Directory for storing backups
+  max_log_size_mb: 10              # Maximum size of the log file in MB (for rotation)
+
+# Model settings
+model:
+  batch_retrain_interval_hours: 24  # Interval for scheduled batch retraining (in hours)
+  batch_sample_size: 100            # Number of samples to use for batch retraining
+  enable_scheduled_retraining: true # Enable/disable scheduled batch retraining
+  enable_incremental_training: true # Enable/disable incremental training on feedback
+  max_feedback_buffer_size: 10      # Maximum number of feedback entries to buffer before retraining
+
+# Logging settings
+logging:
+  level: "INFO"                     # Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+  max_log_file_size_mb: 5           # Maximum size of the app.log file in MB (for rotation)
+  backup_count: 3                   # Number of backup log files to keep
